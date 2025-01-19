@@ -1,7 +1,7 @@
 'use client';
 
 import { useAuth } from '@/contexts/AuthContext';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useOTP } from '@/hooks/useOTP';
@@ -143,13 +143,7 @@ export default function AdminDashboard() {
     }
   }, [user, loading, router]);
 
-  useEffect(() => {
-    if (user) {
-      fetchAllStudents();
-    }
-  }, [user]);
-
-  const fetchAllStudents = async () => {
+  const fetchAllStudents = useCallback(async () => {
     if (!user) return;
 
     try {
@@ -174,7 +168,13 @@ export default function AdminDashboard() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      fetchAllStudents();
+    }
+  }, [user, fetchAllStudents]);
 
   const filteredStudents = useMemo(() => {
     if (!searchQuery.trim()) return allStudents;
@@ -304,7 +304,7 @@ export default function AdminDashboard() {
             {/* No Results Message */}
             {filteredStudents.length === 0 && (
               <div className="text-center text-gray-500 py-8">
-                No students found matching "{searchQuery}"
+                No students found matching &ldquo;{searchQuery}&rdquo;
               </div>
             )}
           </div>

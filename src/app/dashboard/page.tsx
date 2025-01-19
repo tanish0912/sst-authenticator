@@ -6,10 +6,17 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useOTP } from '@/hooks/useOTP';
 
+interface UserData {
+  name: string;
+  email: string;
+  rollNumber: string;
+  photoUrl: string;
+}
+
 export default function Dashboard() {
   const { user, logout, loading } = useAuth();
   const router = useRouter();
-  const [userData, setUserData] = useState<any>(null);
+  const [userData, setUserData] = useState<UserData | null>(null);
   const [error, setError] = useState('');
   const { otp, timeRemaining } = useOTP();
 
