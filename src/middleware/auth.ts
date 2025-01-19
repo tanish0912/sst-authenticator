@@ -1,6 +1,4 @@
-import { NextResponse } from 'next/server';
 import { auth } from '@/lib/firebase-admin';
-import { cookies } from 'next/headers';
 
 export async function authenticateUser(request: Request) {
   try {
@@ -12,7 +10,7 @@ export async function authenticateUser(request: Request) {
     const token = authHeader.split('Bearer ')[1];
     const decodedToken = await auth.verifyIdToken(token);
     return { uid: decodedToken.uid, email: decodedToken.email };
-  } catch (error) {
+  } catch {
     return { error: 'Invalid token', status: 401 };
   }
 }

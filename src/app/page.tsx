@@ -61,11 +61,12 @@ export default function Home() {
       <div className="flex-1 flex flex-col items-center justify-between p-8 max-w-md mx-auto w-full">
         {/* Image and Text */}
         <div className="flex flex-col items-center space-y-6 flex-1 justify-center w-full">
-          <div className="w-full max-w-[320px] h-[320px] flex items-center justify-center">
-            <img
+          <div className="w-full max-w-[320px] h-[320px] flex items-center justify-center relative">
+            <Image
               src="/loginscreenimg.png"
               alt="Login Screen"
-              className="w-full h-full object-contain"
+              fill
+              className="object-contain"
             />
           </div>
           <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 text-center">

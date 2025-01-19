@@ -81,8 +81,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const studentDoc = querySnapshot.docs[0];
-
       // Check if user is admin
       const isAdmin = email.includes('admin');
       if (isAdmin) {
