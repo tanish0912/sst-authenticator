@@ -17,10 +17,23 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "SST Authenticator",
   description: "Digital ID verification system for SST",
+  manifest: '/manifest.json',
   icons: {
     icon: '/sstlogo.png',
     apple: '/sstlogo.png',
     shortcut: '/sstlogo.png',
+  },
+  themeColor: '#000000',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'SST Authenticator'
+  },
+  viewport: {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
   }
 };
 
