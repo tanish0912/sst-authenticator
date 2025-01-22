@@ -1,19 +1,44 @@
 'use client';
 
 import { useAuth } from '@/contexts/AuthContext';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 
 export default function Home() {
   const { user, signInWithGoogle, loading } = useAuth();
   const router = useRouter();
+  const [isCheckingAdmin, setIsCheckingAdmin] = useState(false);
 
   useEffect(() => {
-    if (user && !loading) {
-      router.push('/dashboard');
+    async function checkAdminAndRedirect() {
+      if (user && !loading && !isCheckingAdmin) {
+        setIsCheckingAdmin(true);
+        try {
+          const token = await user.getIdToken();
+          const response = await fetch('/api/admin/check', {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          
+          const data = await response.json();
+          if (response.ok && data.isAdmin) {
+            router.push('/admin');
+          } else {
+            router.push('/dashboard');
+          }
+        } catch (error) {
+          console.error('Error checking admin status:', error);
+          router.push('/dashboard');
+        } finally {
+          setIsCheckingAdmin(false);
+        }
+      }
     }
-  }, [user, loading, router]);
+
+    checkAdminAndRedirect();
+  }, [user, loading, router, isCheckingAdmin]);
 
   if (loading) {
     return (
