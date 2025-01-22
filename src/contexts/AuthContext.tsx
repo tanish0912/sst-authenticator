@@ -27,6 +27,12 @@ const AuthContext = createContext<AuthContextType>({
   logout: async () => {},
 });
 
+// Helper function to check if email is admin
+const isAdminEmail = (email: string) => {
+  const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || [];
+  return adminEmails.includes(email);
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -47,13 +53,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const result = await signInWithPopup(auth, provider);
       const email = result.user.email;
 
-      if (!email?.endsWith('@sst.scaler.com')) {
+      if (!email) {
+        await signOut(auth);
+        toast.error('Email not found');
+        return;
+      }
+
+      // Check if user is admin first
+      const token = await result.user.getIdToken();
+      const response = await fetch('/api/admin/check', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const { isAdmin } = await response.json();
+
+      // If admin, create session and redirect
+      if (isAdmin) {
+        await setDoc(doc(db, 'sessions', result.user.uid), {
+          email: result.user.email,
+          lastActive: new Date().toISOString(),
+        });
+        router.push('/admin');
+        return;
+      }
+
+      // For non-admin users, check Scaler email
+      if (!email.endsWith('@sst.scaler.com')) {
         await signOut(auth);
         toast.error('Please use your Scaler email address');
         return;
       }
 
-      // Check for existing session
+      // Check for existing session for non-admin users
       const sessionDoc = await getDoc(doc(db, 'sessions', result.user.uid));
       if (sessionDoc.exists()) {
         await signOut(auth);
@@ -61,7 +93,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // Create new session
+      // Create new session for non-admin users
       await setDoc(doc(db, 'sessions', result.user.uid), {
         email: result.user.email,
         lastActive: new Date().toISOString(),
@@ -71,23 +103,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const rollNumber = email.split('@')[0].split('.')[1].toUpperCase();
       
       // Verify student exists in database
-      const studentsRef = collection(db, 'students');
-      const q = query(studentsRef, where('rollNo', '==', rollNumber));
-      const querySnapshot = await getDocs(q);
+      const studentDoc = await getDoc(doc(db, 'students', rollNumber));
       
-      if (querySnapshot.empty) {
+      if (!studentDoc.exists()) {
         await signOut(auth);
         toast.error('Student record not found');
         return;
       }
 
-      // Check if user is admin
-      const isAdmin = email.includes('admin');
-      if (isAdmin) {
-        router.push('/admin');
-      } else {
-        router.push('/dashboard');
-      }
+      router.push('/dashboard');
 
     } catch (error) {
       console.error('Error signing in with Google:', error);

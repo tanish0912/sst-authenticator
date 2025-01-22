@@ -28,11 +28,11 @@ export async function GET(request: Request) {
       return NextResponse.json({ message: "User not found" }, { status: 404 });
     }
 
-    const { name, photo } = studentDoc.data() as { name: string; photo: string };
-    const fileId = extractFileId(photo);
+    const { name, photoUrl } = studentDoc.data() as { name: string; photoUrl: string };
+    const fileId = extractFileId(photoUrl);
     const thumbnailPhoto = fileId
       ? `https://drive.google.com/thumbnail?id=${fileId}`
-      : photo;
+      : photoUrl;
 
     return NextResponse.json({ 
       user: {

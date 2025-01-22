@@ -1,24 +1,27 @@
-import { initializeApp, cert, getApps } from 'firebase-admin/app';
+import { initializeApp, cert, getApps, getApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 
-const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID;
-const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
-const privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY;
+function getFirebaseAdminApp() {
+  const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
+  const privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY;
 
-if (!projectId || !clientEmail || !privateKey) {
-  throw new Error(
-    'Missing Firebase Admin credentials. Please check your environment variables.'
-  );
-}
+  if (!projectId || !clientEmail || !privateKey) {
+    throw new Error(
+      'Missing Firebase Admin credentials. Please check your environment variables.'
+    );
+  }
 
-if (!getApps().length) {
+  if (getApps().length > 0) {
+    return getApp();
+  }
+
   try {
-    initializeApp({
+    return initializeApp({
       credential: cert({
         projectId,
         clientEmail,
-        // Handle both formats of private key
         privateKey: privateKey.includes('\\n') 
           ? privateKey.replace(/\\n/g, '\n')
           : privateKey,
@@ -30,5 +33,9 @@ if (!getApps().length) {
   }
 }
 
-export const db = getFirestore();
-export const auth = getAuth();
+// Initialize Firebase Admin
+const app = getFirebaseAdminApp();
+
+// Export initialized services
+export const db = getFirestore(app);
+export const auth = getAuth(app);

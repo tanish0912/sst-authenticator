@@ -38,15 +38,17 @@ export default function Dashboard() {
           }
         });
 
+        const data = await response.json();
+        
         if (!response.ok) {
-          throw new Error('Failed to fetch user data');
+          setError(data.error || 'Failed to fetch user data');
+          return;
         }
 
-        const data = await response.json();
         setUserData(data.user);
       } catch (err) {
-        setError('Error fetching user data');
-        console.error(err);
+        console.error('Error fetching user data:', err);
+        setError('Network error while fetching user data');
       }
     };
 

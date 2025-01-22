@@ -1,10 +1,17 @@
+'use client';
+
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 
 export function useOTP() {
   const [otp, setOtp] = useState<string>('');
-  const [timeRemaining, setTimeRemaining] = useState<number>(30);
+  const [timeRemaining, setTimeRemaining] = useState<number>(0);
   const { user } = useAuth();
+
+  // Function to calculate initial time remaining
+  const getInitialTimeRemaining = useCallback(() => {
+    return 30 - (Math.floor(Date.now() / 1000) % 30);
+  }, []);
 
   const fetchOTP = useCallback(async () => {
     if (!user) return;
@@ -18,7 +25,9 @@ export function useOTP() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to fetch OTP');
+        const data = await response.json();
+        console.error('OTP fetch failed:', data.error);
+        return;
       }
 
       const data = await response.json();
@@ -29,30 +38,44 @@ export function useOTP() {
     }
   }, [user]);
 
+  // Initialize OTP and timer
   useEffect(() => {
-    // Fetch initial OTP
-    fetchOTP();
+    if (user) {
+      // Set initial time remaining
+      setTimeRemaining(getInitialTimeRemaining());
+      
+      // Fetch initial OTP
+      fetchOTP();
 
-    // Set up countdown interval
-    const countdownInterval = setInterval(() => {
-      setTimeRemaining((prev) => {
-        if (prev <= 1) {
-          // When time is about to expire, fetch new OTP
-          fetchOTP();
-          return 30;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+      // Calculate delay to next 30-second boundary
+      const msToNextWindow = (30 - (Math.floor(Date.now() / 1000) % 30)) * 1000;
+      
+      // Set timeout to align with next 30-second window
+      const alignmentTimeout = setTimeout(() => {
+        fetchOTP();
+        // After alignment, set up regular interval
+        const interval = setInterval(fetchOTP, 30000);
+        return () => clearInterval(interval);
+      }, msToNextWindow);
 
-    // Set up a backup interval to ensure OTP stays in sync
-    const syncInterval = setInterval(fetchOTP, 15000);
+      return () => clearTimeout(alignmentTimeout);
+    } else {
+      setOtp('');
+      setTimeRemaining(0);
+    }
+  }, [fetchOTP, getInitialTimeRemaining, user]);
 
-    return () => {
-      clearInterval(countdownInterval);
-      clearInterval(syncInterval);
-    };
-  }, [fetchOTP]);
+  // Update time remaining every second
+  useEffect(() => {
+    if (user) {
+      const timer = setInterval(() => {
+        const remaining = 30 - (Math.floor(Date.now() / 1000) % 30);
+        setTimeRemaining(remaining);
+      }, 1000);
+
+      return () => clearInterval(timer);
+    }
+  }, [user]);
 
   return { otp, timeRemaining };
 }

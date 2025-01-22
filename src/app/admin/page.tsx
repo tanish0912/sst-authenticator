@@ -50,6 +50,10 @@ function ProfileModal({ student, onClose }: { student: StudentData; onClose: () 
                 sizes="(max-width: 768px) 280px, 280px"
                 className="object-cover"
                 priority
+                onError={(e) => {
+                  const img = e.target as HTMLImageElement;
+                  img.src = '/default-avatar.png';
+                }}
               />
             </div>
           </div>
@@ -281,7 +285,7 @@ export default function AdminDashboard() {
                   className="bg-white border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow p-4 cursor-pointer"
                   onClick={() => setSelectedStudent(student)}
                 >
-                  <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-3">
                     <div className="relative w-12 h-12 rounded-full overflow-hidden">
                       <Image
                         src={student.photoUrl || '/default-avatar.png'}
@@ -289,12 +293,15 @@ export default function AdminDashboard() {
                         fill
                         sizes="48px"
                         className="object-cover"
+                        onError={(e) => {
+                          const img = e.target as HTMLImageElement;
+                          img.src = '/default-avatar.png';
+                        }}
                       />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <h3 className="font-semibold text-gray-900 truncate">{student.name}</h3>
-                      <p className="text-sm text-gray-600 truncate">{student.email}</p>
-                      <p className="text-sm text-gray-500">Roll: {student.rollNumber}</p>
+                      <p className="text-sm font-medium text-gray-900 truncate">{student.name}</p>
+                      <p className="text-sm text-gray-500 truncate">{student.rollNumber}</p>
                     </div>
                   </div>
                 </div>

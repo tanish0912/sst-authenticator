@@ -72,3 +72,7 @@ logs
 
 # Yarn Integrity file
 .yarn-integrity
+
+# Sensitive API endpoints
+/src/app/api/admin/deleteAllStudents
+/src/app/api/admin/uploadStudents

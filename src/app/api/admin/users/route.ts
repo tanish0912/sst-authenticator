@@ -35,11 +35,11 @@ export async function GET(request: Request) {
         return NextResponse.json({ message: "User not found" }, { status: 404 });
       }
 
-      const { name, photo } = studentDoc.data() as { name: string; photo: string };
-      const fileId = extractFileId(photo);
+      const { name, photoUrl } = studentDoc.data() as { name: string; photoUrl: string };
+      const fileId = extractFileId(photoUrl);
       const thumbnailPhoto = fileId
         ? `https://drive.google.com/thumbnail?id=${fileId}`
-        : photo;
+        : photoUrl;
 
       return NextResponse.json({
         user: {
@@ -50,29 +50,29 @@ export async function GET(request: Request) {
           email
         }
       });
-    } else {
-      // Get all students
-      const studentsSnapshot = await db.collection('students').get();
-      const students = studentsSnapshot.docs.map(doc => {
-        const data = doc.data();
-        const fileId = extractFileId(data.photo);
-        const thumbnailPhoto = fileId
-          ? `https://drive.google.com/thumbnail?id=${fileId}`
-          : data.photo;
-
-        return {
-          id: doc.id,
-          name: data.name,
-          rollNumber: doc.id,
-          photoUrl: thumbnailPhoto,
-          email: `${data.name.toLowerCase().replace(/\s+/g, '')}.${doc.id.toLowerCase()}@sst.scaler.com`
-        };
-      });
-
-      return NextResponse.json({ users: students });
     }
+
+    // If no email provided, get all students
+    const studentsSnapshot = await db.collection('students').get();
+    const students = studentsSnapshot.docs.map(doc => {
+      const data = doc.data();
+      const fileId = extractFileId(data.photoUrl);
+      const thumbnailPhoto = fileId
+        ? `https://drive.google.com/thumbnail?id=${fileId}`
+        : data.photoUrl;
+
+      return {
+        id: doc.id,
+        name: data.name,
+        rollNumber: doc.id,
+        photoUrl: thumbnailPhoto
+      };
+    });
+
+    return NextResponse.json({ users: students });
+
   } catch (error) {
-    console.error("Error fetching user data:", error);
-    return NextResponse.json({ message: "Internal Server Error" }, { status: 500 });
+    console.error('Error fetching users:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
