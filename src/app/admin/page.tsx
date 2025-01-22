@@ -5,20 +5,26 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useOTP } from '@/hooks/useOTP';
+import { debounce } from 'lodash';
 
 interface StudentData {
   id: string;
   name: string;
   rollNumber: string;
   photoUrl: string;
-  email: string;
+}
+
+interface PaginationData {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }
 
 function ProfileModal({ student, onClose }: { student: StudentData; onClose: () => void }) {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md relative overflow-hidden">
-        {/* Back Button */}
         <button
           onClick={onClose}
           className="absolute top-4 left-4 p-2 hover:bg-gray-100 rounded-full transition-colors z-10"
@@ -39,7 +45,6 @@ function ProfileModal({ student, onClose }: { student: StudentData; onClose: () 
           </svg>
         </button>
 
-        {/* Profile Header */}
         <div className="bg-gradient-to-b from-blue-500 to-blue-600">
           <div className="max-w-[280px] mx-auto pt-8">
             <div className="relative aspect-[4/5] rounded-lg overflow-hidden border-2 border-white shadow-md">
@@ -62,7 +67,6 @@ function ProfileModal({ student, onClose }: { student: StudentData; onClose: () 
           </div>
         </div>
 
-        {/* Profile Details */}
         <div className="p-4 sm:p-6 space-y-4">
           <div className="space-y-3">
             <div className="flex items-center space-x-3">
@@ -104,27 +108,21 @@ function ProfileModal({ student, onClose }: { student: StudentData; onClose: () 
                 <p className="font-medium text-gray-900 truncate">{student.rollNumber}</p>
               </div>
             </div>
-
-            <div className="flex items-center space-x-3">
-              <svg
-                className="w-5 h-5 text-gray-500 flex-shrink-0"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                />
-              </svg>
-              <div className="min-w-0">
-                <p className="text-sm text-gray-500">Email</p>
-                <p className="font-medium text-gray-900 truncate">{student.email}</p>
-              </div>
-            </div>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LoadingCard() {
+  return (
+    <div className="bg-white border rounded-lg overflow-hidden shadow-sm p-4 animate-pulse">
+      <div className="flex items-center space-x-3">
+        <div className="w-12 h-12 bg-gray-200 rounded-full"></div>
+        <div className="flex-1 space-y-2">
+          <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+          <div className="h-3 bg-gray-200 rounded w-1/2"></div>
         </div>
       </div>
     </div>
@@ -135,11 +133,18 @@ export default function AdminDashboard() {
   const { user, logout, loading } = useAuth();
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
-  const [allStudents, setAllStudents] = useState<StudentData[]>([]);
+  const [students, setStudents] = useState<StudentData[]>([]);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
   const { otp, timeRemaining } = useOTP();
   const [selectedStudent, setSelectedStudent] = useState<StudentData | null>(null);
+  const [pagination, setPagination] = useState<PaginationData>({
+    total: 0,
+    page: 1,
+    limit: 20,
+    totalPages: 0
+  });
 
   useEffect(() => {
     if (!loading && !user) {
@@ -147,176 +152,201 @@ export default function AdminDashboard() {
     }
   }, [user, loading, router]);
 
-  const fetchAllStudents = useCallback(async () => {
+  const fetchStudents = useCallback(async (page: number, search: string = '') => {
     if (!user) return;
 
     try {
-      setIsLoading(true);
+      if (search) {
+        setIsSearching(true);
+      } else {
+        setIsLoading(true);
+      }
+      
       const token = await user.getIdToken();
-      const response = await fetch('/api/admin/users', {
-        headers: {
-          'Authorization': `Bearer ${token}`
+      const response = await fetch(
+        `/api/admin/users?page=${page}&limit=${pagination.limit}&search=${search}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
         }
-      });
+      );
 
       if (!response.ok) {
         throw new Error('Failed to fetch students');
       }
 
       const data = await response.json();
-      setAllStudents(data.users);
+      setStudents(data.users);
+      setPagination(data.pagination);
       setError('');
     } catch (err) {
       setError('Error fetching students data');
       console.error(err);
     } finally {
       setIsLoading(false);
+      setIsSearching(false);
     }
-  }, [user]);
+  }, [user, pagination.limit]);
+
+  // Debounced search function with 300ms delay
+  const debouncedSearch = useMemo(
+    () => debounce((search: string) => {
+      if (search) {
+        // Reset to first page when searching
+        fetchStudents(1, search);
+      } else {
+        // If search is cleared, reset to first page without search
+        fetchStudents(1);
+      }
+    }, 300),
+    [fetchStudents]
+  );
 
   useEffect(() => {
     if (user) {
-      fetchAllStudents();
+      debouncedSearch(searchQuery.toUpperCase());
     }
-  }, [user, fetchAllStudents]);
+    return () => {
+      debouncedSearch.cancel();
+    };
+  }, [user, searchQuery, debouncedSearch]);
 
-  const filteredStudents = useMemo(() => {
-    if (!searchQuery.trim()) return allStudents;
-    
-    const query = searchQuery.toUpperCase();
-    return allStudents.filter(student => 
-      student.rollNumber.includes(query)
-    );
-  }, [searchQuery, allStudents]);
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+  };
 
-  if (loading || isLoading || !allStudents.length) {
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= pagination.totalPages) {
+      fetchStudents(newPage, searchQuery);
+    }
+  };
+
+  if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center">
-        <div className="flex flex-col items-center space-y-4">
-          <div className="relative w-32 h-10 loading-logo">
-            <Image
-              src="https://assets-v2.scaler.com/assets/programs/undergrad/webp/sst-logo-044e63073f49b767e6bca532d5fe0145b768bb12699e822d7cbce37efaa5f8f4.webp.gz"
-              alt="SST Logo"
-              fill
-              sizes="(max-width: 768px) 128px, 128px"
-              className="object-contain"
-              priority
-              unoptimized
-            />
-          </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-            <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-            <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-          </div>
-        </div>
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
       </div>
     );
   }
 
   return (
-    <main className="min-h-screen bg-gray-100 py-4 sm:py-12 px-2 sm:px-4">
+    <div className="min-h-screen bg-gray-100">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 space-y-4 sm:space-y-0">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
+            <p className="text-sm text-gray-500">Manage student profiles and authentication</p>
+          </div>
+          <div className="flex items-center space-x-4">
+            <div className="bg-white rounded-lg shadow-md px-6 py-3 border border-gray-200">
+              <p className="text-sm font-medium text-gray-700">Current OTP</p>
+              <div className="flex items-center space-x-2 mt-1">
+                <span className="text-2xl font-mono font-bold text-blue-600">{otp}</span>
+                <span className="text-sm font-medium text-gray-600">({timeRemaining}s)</span>
+              </div>
+            </div>
+            <button
+              onClick={() => logout()}
+              className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors"
+            >
+              Logout
+            </button>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search by roll number..."
+              value={searchQuery}
+              onChange={handleSearch}
+              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow text-black"
+            />
+            {isSearching && (
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-blue-500"></div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          {isLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[...Array(6)].map((_, i) => (
+                <LoadingCard key={i} />
+              ))}
+            </div>
+          ) : error ? (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+              {error}
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {students.map((student) => (
+                  <div
+                    key={student.id}
+                    className="bg-white border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow p-4 cursor-pointer"
+                    onClick={() => setSelectedStudent(student)}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="relative w-12 h-12 rounded-full overflow-hidden">
+                        <Image
+                          src={student.photoUrl || '/default-avatar.png'}
+                          alt={student.name}
+                          fill
+                          sizes="48px"
+                          className="object-cover"
+                          onError={(e) => {
+                            const img = e.target as HTMLImageElement;
+                            img.src = '/default-avatar.png';
+                          }}
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-gray-900 truncate">{student.name}</p>
+                        <p className="text-sm text-gray-500 truncate">{student.rollNumber}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {pagination.totalPages > 1 && (
+                <div className="flex justify-center items-center space-x-3 mt-6 bg-white p-4 rounded-lg shadow-sm">
+                  <button
+                    onClick={() => handlePageChange(pagination.page - 1)}
+                    disabled={pagination.page === 1}
+                    className="px-4 py-2 border rounded-lg disabled:opacity-50 disabled:bg-gray-100 hover:bg-gray-50 transition-colors text-gray-700 font-medium"
+                  >
+                    Previous
+                  </button>
+                  <span className="px-4 py-2 bg-gray-50 rounded-lg text-gray-700 font-medium">
+                    Page {pagination.page} of {pagination.totalPages}
+                  </span>
+                  <button
+                    onClick={() => handlePageChange(pagination.page + 1)}
+                    disabled={pagination.page === pagination.totalPages}
+                    className="px-4 py-2 border rounded-lg disabled:opacity-50 disabled:bg-gray-100 hover:bg-gray-50 transition-colors text-gray-700 font-medium"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
       {selectedStudent && (
         <ProfileModal
           student={selectedStudent}
           onClose={() => setSelectedStudent(null)}
         />
       )}
-      
-      <div className="max-w-6xl mx-auto">
-        <div className="bg-white rounded-xl shadow-lg overflow-hidden mb-6">
-          <div className="p-4 sm:p-6">
-            {/* Header Section */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 space-y-4 sm:space-y-0">
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Admin Dashboard</h1>
-              <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 w-full sm:w-auto">
-                {/* OTP Display */}
-                <div className="bg-blue-50 p-3 sm:p-4 rounded-lg w-full sm:w-auto">
-                  <h3 className="text-sm font-medium text-blue-900 mb-1">Current OTP</h3>
-                  <div className="text-xl sm:text-2xl font-bold text-blue-600 mb-1">{otp}</div>
-                  <div className="text-sm text-blue-500">
-                    Expires in: {timeRemaining}s
-                  </div>
-                </div>
-                <button
-                  onClick={logout}
-                  className="text-sm text-red-600 hover:text-red-800 w-full sm:w-auto text-center sm:text-left px-4 py-2 border border-red-200 rounded-lg sm:border-none"
-                >
-                  Sign Out
-                </button>
-              </div>
-            </div>
-
-            {/* Search Section */}
-            <div className="mb-6">
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Search by Roll Number..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 pl-10 text-black"
-                />
-                <svg
-                  className="absolute left-3 top-3.5 h-5 w-5 text-gray-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                  />
-                </svg>
-              </div>
-            </div>
-
-            {error && (
-              <div className="text-red-600 text-center mb-4">{error}</div>
-            )}
-
-            {/* Students Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-              {filteredStudents.map((student) => (
-                <div
-                  key={student.id}
-                  className="bg-white border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow p-4 cursor-pointer"
-                  onClick={() => setSelectedStudent(student)}
-                >
-                  <div className="flex items-center space-x-3">
-                    <div className="relative w-12 h-12 rounded-full overflow-hidden">
-                      <Image
-                        src={student.photoUrl || '/default-avatar.png'}
-                        alt={student.name}
-                        fill
-                        sizes="48px"
-                        className="object-cover"
-                        onError={(e) => {
-                          const img = e.target as HTMLImageElement;
-                          img.src = '/default-avatar.png';
-                        }}
-                      />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-gray-900 truncate">{student.name}</p>
-                      <p className="text-sm text-gray-500 truncate">{student.rollNumber}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* No Results Message */}
-            {filteredStudents.length === 0 && (
-              <div className="text-center text-gray-500 py-8">
-                No students found matching &ldquo;{searchQuery}&rdquo;
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </main>
+    </div>
   );
 }
