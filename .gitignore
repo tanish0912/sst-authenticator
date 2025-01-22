@@ -76,3 +76,6 @@ logs
 # Sensitive API endpoints
 /src/app/api/admin/deleteAllStudents
 /src/app/api/admin/uploadStudents
+
+# Sensitive data
+card_data.csv

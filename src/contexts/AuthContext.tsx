@@ -8,8 +8,8 @@ import {
   onAuthStateChanged,
   User 
 } from 'firebase/auth';
-import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, deleteDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { auth } from '@/lib/firebase';
+import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 
@@ -26,12 +26,6 @@ const AuthContext = createContext<AuthContextType>({
   signInWithGoogle: async () => {},
   logout: async () => {},
 });
-
-// Helper function to check if email is admin
-const isAdminEmail = (email: string) => {
-  const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || [];
-  return adminEmails.includes(email);
-};
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);

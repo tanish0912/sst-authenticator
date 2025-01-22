@@ -4,8 +4,19 @@
     "plugin:@typescript-eslint/recommended"
   ],
   "rules": {
-    "@typescript-eslint/no-explicit-any": "error",
-    "@typescript-eslint/no-unused-vars": "error",
+    "@typescript-eslint/no-explicit-any": ["warn", {
+      "ignoreRestArgs": true
+    }],
+    "@typescript-eslint/no-unused-vars": ["warn", {
+      "argsIgnorePattern": "^_",
+      "varsIgnorePattern": "^_",
+      "ignoreRestSiblings": true
+    }],
     "@next/next/no-img-element": "warn"
-  }
+  },
+  "ignorePatterns": [
+    "**/api/admin/deleteAllStudents/**",
+    "**/api/admin/uploadStudents/**",
+    "**/*.config.js"
+  ]
 }

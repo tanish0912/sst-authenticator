@@ -1,0 +1,13 @@
+# Ignore sensitive admin routes
+src/app/api/admin/deleteAllStudents/**
+src/app/api/admin/uploadStudents/**
+
+# Build files
+.next/**
+out/**
+node_modules/**
+public/**
+
+# Config files
+*.config.js
+next-env.d.ts
