@@ -7,15 +7,9 @@ interface CounterData {
   lastResetMonth: number;
 }
 
-type Props = {
-  params: {
-    studentId: string;
-  };
-};
-
 export async function GET(
   request: NextRequest,
-  { params }: Props
+  { params }: { params: { studentId: string } }
 ) {
   try {
     const authResult = await authenticateUser(request);
@@ -60,7 +54,7 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: Props
+  { params }: { params: { studentId: string } }
 ) {
   try {
     const authResult = await authenticateUser(request);
