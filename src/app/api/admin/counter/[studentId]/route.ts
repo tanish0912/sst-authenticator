@@ -9,79 +9,79 @@ interface CounterData {
 
 export async function GET(
   request: NextRequest,
-  context: { params: { studentId: string } }
+  { params }: { params: { studentId: string } }
 ) {
   try {
+    // Authentication and authorization logic
     const authResult = await authenticateUser(request);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
     
     if (!authResult.email) {
-      return NextResponse.json({ error: 'Email not found in authentication result' }, { status: 400 });
+      return NextResponse.json({ error: 'Email not found' }, { status: 400 });
     }
-    const isUserAdmin = await isAdmin(authResult.email);
-    if (!isUserAdmin) {
-      return NextResponse.json({ error: 'Unauthorized - Admin access required' }, { status: 403 });
+    
+    if (!await isAdmin(authResult.email)) {
+      return NextResponse.json({ error: 'Admin required' }, { status: 403 });
     }
 
-    const studentId = context.params.studentId;
-    const counterDoc = await db.collection('studentCounters').doc(studentId).get();
-    
+    // Counter logic
+    const counterDoc = await db.collection('studentCounters').doc(params.studentId).get();
     const currentMonth = new Date().getMonth();
-    
+
     if (!counterDoc.exists) {
       return NextResponse.json({ counter: 0, lastResetMonth: currentMonth });
     }
 
     const data = counterDoc.data() as CounterData;
     
-    // Reset counter if it's a new month
     if (data.lastResetMonth !== currentMonth) {
-      await db.collection('studentCounters').doc(studentId).set({
+      await db.collection('studentCounters').doc(params.studentId).set({
         counter: 0,
         lastResetMonth: currentMonth
       });
       return NextResponse.json({ counter: 0, lastResetMonth: currentMonth });
     }
 
-    return NextResponse.json({ counter: data.counter, lastResetMonth: data.lastResetMonth });
+    return NextResponse.json(data);
   } catch (error) {
-    console.error('Error in GET /api/admin/counter/[studentId]:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    console.error('GET Error:', error);
+    return NextResponse.json({ error: 'Server Error' }, { status: 500 });
   }
 }
 
 export async function POST(
   request: NextRequest,
-  context: { params: { studentId: string } }
+  { params }: { params: { studentId: string } }
 ) {
   try {
+    // Authentication and authorization logic
     const authResult = await authenticateUser(request);
     if ('error' in authResult) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
     
     if (!authResult.email) {
-      return NextResponse.json({ error: 'Email not found in authentication result' }, { status: 400 });
+      return NextResponse.json({ error: 'Email not found' }, { status: 400 });
     }
-    const isUserAdmin = await isAdmin(authResult.email);
-    if (!isUserAdmin) {
-      return NextResponse.json({ error: 'Unauthorized - Admin access required' }, { status: 403 });
+    
+    if (!await isAdmin(authResult.email)) {
+      return NextResponse.json({ error: 'Admin required' }, { status: 403 });
     }
 
-    const studentId = context.params.studentId;
+    // Update counter logic
     const { counter } = await request.json();
     const currentMonth = new Date().getMonth();
 
-    await db.collection('studentCounters').doc(studentId).set({
+    await db.collection('studentCounters').doc(params.studentId).set({
       counter,
       lastResetMonth: currentMonth
     });
 
     return NextResponse.json({ counter, lastResetMonth: currentMonth });
   } catch (error) {
-    console.error('Error in POST /api/admin/counter/[studentId]:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    console.error('POST Error:', error);
+    return NextResponse.json({ error: 'Server Error' }, { status: 500 });
   }
 }
