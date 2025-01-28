@@ -7,9 +7,15 @@ interface CounterData {
   lastResetMonth: number;
 }
 
+type Props = {
+  params: {
+    studentId: string;
+  };
+};
+
 export async function GET(
   request: NextRequest,
-  context: { params: { studentId: string } }
+  { params }: Props
 ) {
   try {
     const authResult = await authenticateUser(request);
@@ -25,7 +31,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized - Admin access required' }, { status: 403 });
     }
 
-    const studentId = context.params.studentId;
+    const studentId = params.studentId;
     const counterDoc = await db.collection('studentCounters').doc(studentId).get();
     
     const currentMonth = new Date().getMonth();
@@ -54,7 +60,7 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  context: { params: { studentId: string } }
+  { params }: Props
 ) {
   try {
     const authResult = await authenticateUser(request);
@@ -70,7 +76,7 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized - Admin access required' }, { status: 403 });
     }
 
-    const studentId = context.params.studentId;
+    const studentId = params.studentId;
     const { counter } = await request.json();
     const currentMonth = new Date().getMonth();
 
