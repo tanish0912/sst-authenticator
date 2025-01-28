@@ -12,6 +12,7 @@ interface StudentData {
   name: string;
   rollNumber: string;
   photoUrl: string;
+  counter?: number;
 }
 
 interface PaginationData {
@@ -22,6 +23,65 @@ interface PaginationData {
 }
 
 function ProfileModal({ student, onClose }: { student: StudentData; onClose: () => void }) {
+  const { user } = useAuth();
+  const [counter, setCounter] = useState(0);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchCounter = async () => {
+      if (!user) return;
+      try {
+        const token = await user.getIdToken();
+        const response = await fetch(`/api/admin/counter/${student.id}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch counter');
+        }
+        
+        const data = await response.json();
+        setCounter(data.counter);
+      } catch (error) {
+        console.error('Error fetching counter:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchCounter();
+  }, [user, student.id]);
+
+  const handleIncrement = async () => {
+    if (!user || isUpdating) return;
+
+    try {
+      setIsUpdating(true);
+      const token = await user.getIdToken();
+      const response = await fetch(`/api/admin/counter/${student.id}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ counter: counter + 1 })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update counter');
+      }
+
+      setCounter(prev => prev + 1);
+    } catch (error) {
+      console.error('Error updating counter:', error);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md relative overflow-hidden">
@@ -108,8 +168,135 @@ function ProfileModal({ student, onClose }: { student: StudentData; onClose: () 
                 <p className="font-medium text-gray-900 truncate">{student.rollNumber}</p>
               </div>
             </div>
+
+            <div className="flex items-center space-x-3">
+              <svg
+                className="w-5 h-5 text-gray-500 flex-shrink-0"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                />
+              </svg>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm text-gray-500">Counter</p>
+                <div className="flex items-center space-x-3">
+                  {isLoading ? (
+                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-gray-300 border-t-blue-600" />
+                  ) : (
+                    <p className="font-medium text-gray-900">{counter}</p>
+                  )}
+                  <button
+                    onClick={handleIncrement}
+                    disabled={isUpdating || counter >= 3}
+                    className={`p-2 rounded-full transition-colors ${
+                      counter >= 3 
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                        : 'hover:bg-gray-100 text-gray-600'
+                    }`}
+                    title={counter >= 3 ? "Entry limit reached for this month" : "Increment counter"}
+                  >
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function StudentCard({ student, onClick }: { student: StudentData; onClick: () => void }) {
+  const [counter, setCounter] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const { user } = useAuth();
+
+  useEffect(() => {
+    const fetchCounter = async () => {
+      if (!user) return;
+      try {
+        const token = await user.getIdToken();
+        const response = await fetch(`/api/admin/counter/${student.id}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch counter');
+        }
+        
+        const data = await response.json();
+        setCounter(data.counter);
+      } catch (error) {
+        console.error('Error fetching counter:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchCounter();
+  }, [user, student.id]);
+
+  const isProhibited = counter >= 3;
+
+  return (
+    <div 
+      onClick={onClick}
+      className="relative group cursor-pointer"
+    >
+      <div className="aspect-[4/5] rounded-lg overflow-hidden">
+        <div className="relative w-full h-full">
+          <Image
+            src={student.photoUrl || '/default-avatar.png'}
+            alt={student.name}
+            fill
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            className="object-cover transition-transform group-hover:scale-105"
+            onError={(e) => {
+              const img = e.target as HTMLImageElement;
+              img.src = '/default-avatar.png';
+            }}
+          />
+          {isProhibited && (
+            <div className="absolute inset-0 bg-red-500/60 flex items-center justify-center">
+              <div className="text-white text-center px-4">
+                <p className="font-bold">Entry Prohibited</p>
+                <p className="text-sm">for this month</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="mt-2">
+        <h3 className="font-medium text-gray-900">{student.name}</h3>
+        <p className="text-sm text-gray-500">{student.rollNumber}</p>
+        {isLoading ? (
+          <div className="mt-1">
+            <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-300 border-t-blue-600" />
+          </div>
+        ) : (
+          <p className="mt-1 text-sm text-gray-500">Entries: {counter}</p>
+        )}
       </div>
     </div>
   );
@@ -177,7 +364,28 @@ export default function AdminDashboard() {
       }
 
       const data = await response.json();
-      setStudents(data.users);
+      
+      // Fetch counter values for each student
+      const studentsWithCounters = await Promise.all(
+        data.users.map(async (student: StudentData) => {
+          try {
+            const counterResponse = await fetch(`/api/admin/counter/${student.id}`, {
+              headers: {
+                'Authorization': `Bearer ${token}`
+              }
+            });
+            if (counterResponse.ok) {
+              const { counter } = await counterResponse.json();
+              return { ...student, counter };
+            }
+          } catch (error) {
+            console.error(`Error fetching counter for student ${student.id}:`, error);
+          }
+          return { ...student, counter: 0 };
+        })
+      );
+
+      setStudents(studentsWithCounters);
       setPagination(data.pagination);
       setError('');
     } catch (err) {
@@ -289,7 +497,7 @@ export default function AdminDashboard() {
                 {students.map((student) => (
                   <div
                     key={student.id}
-                    className="bg-white border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow p-4 cursor-pointer"
+                    className="bg-white border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow p-4 cursor-pointer relative"
                     onClick={() => setSelectedStudent(student)}
                   >
                     <div className="flex items-center space-x-3">
@@ -311,6 +519,14 @@ export default function AdminDashboard() {
                         <p className="text-sm text-gray-500 truncate">{student.rollNumber}</p>
                       </div>
                     </div>
+                    {(student.counter !== undefined && student.counter >= 3) && (
+                      <div className="absolute inset-0 bg-red-500/60 flex items-center justify-center">
+                        <div className="text-white text-center">
+                          <p className="font-bold">Entry Prohibited</p>
+                          <p className="text-sm">for this month</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
