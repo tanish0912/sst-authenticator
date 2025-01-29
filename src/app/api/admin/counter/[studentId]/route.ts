@@ -9,9 +9,11 @@ interface CounterData {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { studentId: string } }
-) {
+  { params }: { params: Promise<{ studentId: string }> }
+): Promise<NextResponse> {
   try {
+    const { studentId } = await params;
+    
     // Authentication and authorization logic
     const authResult = await authenticateUser(request);
     if ('error' in authResult) {
@@ -27,35 +29,37 @@ export async function GET(
     }
 
     // Counter logic
-    const counterDoc = await db.collection('studentCounters').doc(params.studentId).get();
+    const counterDoc = await db.collection('studentCounters').doc(studentId).get();
     const currentMonth = new Date().getMonth();
 
     if (!counterDoc.exists) {
-      return NextResponse.json({ counter: 0, lastResetMonth: currentMonth });
+      return NextResponse.json({ counter: 0 });
     }
 
     const data = counterDoc.data() as CounterData;
     
     if (data.lastResetMonth !== currentMonth) {
-      await db.collection('studentCounters').doc(params.studentId).set({
+      await db.collection('studentCounters').doc(studentId).set({
         counter: 0,
         lastResetMonth: currentMonth
       });
-      return NextResponse.json({ counter: 0, lastResetMonth: currentMonth });
+      return NextResponse.json({ counter: 0 });
     }
 
-    return NextResponse.json(data);
+    return NextResponse.json({ counter: data.counter });
   } catch (error) {
-    console.error('GET Error:', error);
-    return NextResponse.json({ error: 'Server Error' }, { status: 500 });
+    console.error('Error in GET counter:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { studentId: string } }
-) {
+  { params }: { params: Promise<{ studentId: string }> }
+): Promise<NextResponse> {
   try {
+    const { studentId } = await params;
+    
     // Authentication and authorization logic
     const authResult = await authenticateUser(request);
     if ('error' in authResult) {
@@ -74,14 +78,14 @@ export async function POST(
     const { counter } = await request.json();
     const currentMonth = new Date().getMonth();
 
-    await db.collection('studentCounters').doc(params.studentId).set({
+    await db.collection('studentCounters').doc(studentId).set({
       counter,
       lastResetMonth: currentMonth
     });
 
-    return NextResponse.json({ counter, lastResetMonth: currentMonth });
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('POST Error:', error);
-    return NextResponse.json({ error: 'Server Error' }, { status: 500 });
+    console.error('Error in POST counter:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
